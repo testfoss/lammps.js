@@ -359,3 +359,7 @@ npm run dev
 ```
 
 It uses `tests/fixtures/lj.mini.in`.
+
+## Testfoss
+
+The `testfoss-demo` branch adds a pristine Emscripten 4.0.18 build/test/package workflow and drives the existing Pages example through `lmwebtest`. See [the Testfoss guide](testfoss/README.md) for exact commands and [the evidence record](durable-memory/status.md) for source pins and limitations. The upstream GPLv2 `LICENSE` and conflicting `MIT` package metadata are both preserved; the guide documents that unresolved inconsistency.

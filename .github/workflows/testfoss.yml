@@ -1,0 +1,64 @@
+name: Testfoss
+
+on:
+  push:
+    branches: [testfoss-demo]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: testfoss-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  engine-and-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
+        with:
+          path: ~/emsdk
+          key: testfoss-emsdk-${{ runner.os }}-${{ hashFiles('emsdk_manifest.txt') }}-1693ce7359fc9694f198694f902a2cc061239b86
+      - name: Install pinned Emscripten 4.0.18
+        run: |
+          if [ ! -d "$HOME/emsdk/.git" ]; then
+            git clone https://github.com/emscripten-core/emsdk.git "$HOME/emsdk"
+          fi
+          git -C "$HOME/emsdk" fetch --depth 1 origin 1693ce7359fc9694f198694f902a2cc061239b86
+          git -C "$HOME/emsdk" checkout --detach 1693ce7359fc9694f198694f902a2cc061239b86
+          "$HOME/emsdk/emsdk" install "$(cat emsdk_manifest.txt)"
+          "$HOME/emsdk/emsdk" activate "$(cat emsdk_manifest.txt)"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Build and test default engine from pristine source
+        run: |
+          source "$HOME/emsdk/emsdk_env.sh"
+          export EMSDK_PATH="$HOME/emsdk"
+          npm test
+      - name: Build remaining variants and run all engine tests
+        run: |
+          source "$HOME/emsdk/emsdk_env.sh"
+          export EMSDK_PATH="$HOME/emsdk"
+          npm run test:atomify-serial
+          npm run build:kokkos
+          npm run build:atomify
+          npx vitest run
+      - name: Verify complete non-stub package
+        run: npm run verify:pack
+      - name: Build Pages demo against local engine
+        run: |
+          npm --prefix examples/pages ci
+          npm --prefix examples/pages run build
+      - name: Install pinned lmwebtest host
+        run: testfoss/scripts/install-browser-tools.sh --with-deps chromium
+      - name: Run local-engine Pages demo through lmwebtest
+        run: testfoss/scripts/run-pages-browser.sh

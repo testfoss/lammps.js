@@ -1,0 +1,58 @@
+let base_url = env("LAMMPS_PAGES_URL", "");
+if (base_url == "") {
+  println("[FAIL] Set LAMMPS_PAGES_URL; use testfoss/scripts/run-pages-browser.sh.");
+  exit(1);
+}
+mkdir("testfoss/results");
+
+program = _lmcode_ cli="lmwebtest playwright";
+let b = pw.launch("chromium");
+let p = b.new_page();
+p.set_viewport(1440, 900);
+p.set_default_timeout(120000);
+p.goto(pw.env("LAMMPS_PAGES_URL") + "/");
+p.expect_page("toHaveTitle", "[\"LAMMPS.js\"]");
+p.locator("#run-btn").expect("toHaveText", "[\"Run\"]");
+$return.cross_origin_isolated = p.evaluate("self.crossOriginIsolated");
+p.fill("#lammps-code", "units lj\natom_style atomic\nlattice fcc 0.8442\nregion box block 0 3 0 3 0 3\ncreate_box 1 box\ncreate_atoms 1 box\nmass 1 1.0\nvelocity all create 1.44 87287\npair_style lj/cut 2.5\npair_coeff 1 1 1.0 1.0 2.5\nfix integrate all nve\nthermo 1\nrun 20\n");
+p.click("#run-btn");
+p.locator("#run-btn").expect("toHaveText", "[\"Stop\"]");
+p.locator("#run-btn").expect("toHaveText", "[\"Run\",{\"timeout\":180000}]");
+p.locator("#console-output").expect("toContainText", "[\"Loop time\",{\"timeout\":120000}]");
+let output = p.locator("#console-output").inner_text();
+$return.has_created_atoms = str_contains(output, "Created 108 atoms");
+$return.has_loop_time = str_contains(output, "Loop time");
+$return.has_twenty_steps = str_contains(output, "20 steps with 108 atoms");
+$return.has_error = str_contains(output, "Error:");
+$return.page_errors = p.page_errors();
+p.screenshot("testfoss/results/pages-lj.png", true);
+b.close();
+end _lmcode_
+
+let res = run_lmcode(program, {command: ["lmwebtest", "playwright", "--lmcode", "$DSLFILE"]});
+let stats = {pass: 0, fail: 0};
+fn check(condition, name, detail) {
+  if (condition) {
+    stats["pass"] = stats.get("pass", 0) + 1;
+    println(f"[PASS] {name}: {detail}");
+  } else {
+    stats["fail"] = stats.get("fail", 0) + 1;
+    println(f"[FAIL] {name}: {detail}");
+  }
+}
+check(res.get("ok", false), "lmwebtest run", "Pages Playwright program completed");
+if (!res.get("ok", false)) {
+  println(json_stringify(res));
+  exit(1);
+}
+let r = res.get("result", {});
+check(r.get("cross_origin_isolated", "") == "true", "preview isolation", "cross-origin isolation enabled");
+check(r.get("has_created_atoms", false), "local engine setup", "Created 108 atoms");
+check(r.get("has_loop_time", false), "local engine completion", "Loop time recorded");
+check(r.get("has_twenty_steps", false), "requested dynamics", "20 steps with 108 atoms");
+check(!r.get("has_error", false), "engine output", "no Error line");
+check(r.get("page_errors", "") == "[]", "browser errors", "no uncaught page errors");
+println(f"lammps.js Testfoss: {str(stats.get('pass', 0))} passed, {str(stats.get('fail', 0))} failed");
+if (stats.get("fail", 0) > 0) {
+  exit(1);
+}
