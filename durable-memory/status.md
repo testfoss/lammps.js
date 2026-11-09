@@ -49,3 +49,7 @@ The public Testfoss track deliberately does not carry that patch. The pristine p
 - The existing Pages demo is the browser integration target; the separate three.js and notebook deployments are not built by this track.
 - The upstream `LICENSE` is GNU GPLv2, while upstream `package.json` declares `MIT`. This conflict is unresolved upstream metadata. Both are preserved byte-for-byte; review licensing before redistribution.
 - No tarballs, `dist`, C++ build trees, tool checkouts, `node_modules`, screenshots, logs, secrets, deployment credentials, or publication steps are committed.
+
+## Remote verification
+
+GitHub Actions run 42644036809 passed all four pristine engine builds and their tests, complete non-stub package verification, the Pages production build, and the local-engine LJ browser scenario through lmwebtest.
